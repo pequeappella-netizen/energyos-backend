@@ -47,9 +47,7 @@ async function getToken() {
       terminalUUID: "energyos-backend-001"
     }
   });
-  if (r.error_code === 0) {
-    tapoToken = r.result.token;
-  }
+  if (r.error_code === 0) tapoToken = r.result.token;
   return tapoToken;
 }
 
@@ -61,6 +59,14 @@ async function getDeviceList() {
   return r.result?.deviceList || [];
 }
 
+function decode(alias) {
+  try {
+    return Buffer.from(alias || "", "base64").toString("utf8");
+  } catch(e) {
+    return alias;
+  }
+}
+
 app.get("/api/health", (req, res) => {
   res.json({ status:"ok", version:"1.0.0" });
 });
@@ -68,17 +74,17 @@ app.get("/api/health", (req, res) => {
 app.get("/api/tapo-test", async (req, res) => {
   try {
     const token = await getToken();
-    if (token) {
-      const list = await getDeviceList();
-      res.json({
-        success: true,
-        token: token.substring(0,10)+"...",
-        deviceCount: list.length,
-        devices: list.map(d => ({ alias: d.alias, status: d.status }))
-      });
-    } else {
-      res.json({ success:false, error:"Login fallido — verifica email y contraseña en Environment" });
-    }
+    const list = await getDeviceList();
+    res.json({
+      success: !!token,
+      deviceCount: list.length,
+      devices: list.map(d => ({
+        alias_raw: d.alias,
+        alias_decoded: decode(d.alias),
+        status: d.status,
+        deviceType: d.deviceType
+      }))
+    });
   } catch(e) {
     res.json({ success:false, error: e.message });
   }
@@ -88,12 +94,12 @@ app.get("/api/devices", async (req, res) => {
   try {
     const list = await getDeviceList();
     const result = DEVICES.map(d => {
-      const decodedAlias = Buffer.from(t.alias || "", "base64").toString("utf8");
-const tapo = list.find(t => {
-  const decoded = Buffer.from(t.alias || "", "base64").toString("utf8");
-  return decoded === d.name;
-});
-      return { ...d, online: !!tapo, on: tapo ? tapo.status === 1 : false };
+      const tapo = list.find(t => decode(t.alias) === d.name);
+      return {
+        ...d,
+        online: !!tapo,
+        on: tapo ? tapo.status === 1 : false
+      };
     });
     res.json(result);
   } catch(e) {
@@ -104,7 +110,7 @@ const tapo = list.find(t => {
 app.post("/api/devices/:id/toggle", async (req, res) => {
   const d = DEVICES.find(x => x.id === req.params.id);
   if (!d) return res.status(404).json({ error:"No encontrado" });
-  res.json({ id:d.id, on:true, message:`${d.name} toggled` });
+  res.json({ id:d.id, on:true });
 });
 
 const PORT = process.env.PORT || 3001;
