@@ -61,9 +61,9 @@ async function getDeviceList() {
 
 function decode(alias) {
   try {
-    return Buffer.from(alias || "", "base64").toString("utf8");
+    return Buffer.from(alias || "", "base64").toString("utf8").trim();
   } catch(e) {
-    return alias;
+    return (alias || "").trim();
   }
 }
 
@@ -79,10 +79,8 @@ app.get("/api/tapo-test", async (req, res) => {
       success: !!token,
       deviceCount: list.length,
       devices: list.map(d => ({
-        alias_raw: d.alias,
         alias_decoded: decode(d.alias),
-        status: d.status,
-        deviceType: d.deviceType
+        status: d.status
       }))
     });
   } catch(e) {
