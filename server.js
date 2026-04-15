@@ -12,7 +12,7 @@ app.use((req, res, next) => {
 
 const DEVICES = [
   { id:"d1", name:"Heladera",     icon:"🧊", watts:150  },
-  { id:"d2", name:"TV/Impresora", icon:"📺", watts:120  },
+  { id:"d2", name:"TV /Impresora", icon:"📺", watts:120  },
   { id:"d3", name:"Lavadora",     icon:"🫧", watts:1000 },
   { id:"d4", name:"Lavavajillas", icon:"🍽️", watts:800  },
 ];
