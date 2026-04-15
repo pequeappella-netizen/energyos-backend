@@ -28,7 +28,7 @@ async function post(hostname, path, body) {
     }, res => {
       let b = "";
       res.on("data", c => b += c);
-      res.on("end", () => resolve(JSON.parse(b)));
+      res.on("end", () => { try { resolve(JSON.parse(b)); } catch(e) { reject(e); } });
     });
     req.on("error", reject);
     req.write(data);
@@ -44,10 +44,12 @@ async function getToken() {
       appType: "Tapo_Android",
       cloudUserName: process.env.TAPO_EMAIL,
       cloudPassword: process.env.TAPO_PASSWORD,
-      terminalUUID: "energyos-backend"
+      terminalUUID: "energyos-backend-001"
     }
   });
-  tapoToken = r.result?.token;
+  if (r.error_code === 0) {
+    tapoToken = r.result.token;
+  }
   return tapoToken;
 }
 
@@ -63,16 +65,31 @@ app.get("/api/health", (req, res) => {
   res.json({ status:"ok", version:"1.0.0" });
 });
 
+app.get("/api/tapo-test", async (req, res) => {
+  try {
+    const token = await getToken();
+    if (token) {
+      const list = await getDeviceList();
+      res.json({
+        success: true,
+        token: token.substring(0,10)+"...",
+        deviceCount: list.length,
+        devices: list.map(d => ({ alias: d.alias, status: d.status }))
+      });
+    } else {
+      res.json({ success:false, error:"Login fallido — verifica email y contraseña en Environment" });
+    }
+  } catch(e) {
+    res.json({ success:false, error: e.message });
+  }
+});
+
 app.get("/api/devices", async (req, res) => {
   try {
     const list = await getDeviceList();
     const result = DEVICES.map(d => {
       const tapo = list.find(t => t.alias === d.name);
-      return {
-        ...d,
-        online: tapo ? true : false,
-        on: tapo ? tapo.status === 1 : false,
-      };
+      return { ...d, online: !!tapo, on: tapo ? tapo.status === 1 : false };
     });
     res.json(result);
   } catch(e) {
