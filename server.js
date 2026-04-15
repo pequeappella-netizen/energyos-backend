@@ -9,11 +9,14 @@ app.use((req, res, next) => {
   next();
 });
 
+const TAPO_EMAIL = process.env.TAPO_EMAIL || "";
+const TAPO_PASSWORD = process.env.TAPO_PASSWORD || "";
+
 const DEVICES = [
-  { id:"d1", name:"Heladera",     icon:"🧊", watts:150  },
-  { id:"d2", name:"TV/Impresora", icon:"📺", watts:120  },
-  { id:"d3", name:"Lavadora",     icon:"🫧", watts:1000 },
-  { id:"d4", name:"Lavavajillas", icon:"🍽️", watts:800  },
+  { id:"d1", name:"Heladera",     icon:"🧊", ip:"192.168.192.2" },
+  { id:"d2", name:"TV/Impresora", icon:"📺", ip:"192.168.192.3" },
+  { id:"d3", name:"Lavadora",     icon:"🫧", ip:"192.168.192.4" },
+  { id:"d4", name:"Lavavajillas", icon:"🍽️", ip:"192.168.192.5" },
 ];
 
 app.get("/api/health", (req, res) => {
@@ -21,7 +24,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api/devices", (req, res) => {
-  res.json(DEVICES.map(d => ({ ...d, on:false, watts:0 })));
+  res.json(DEVICES.map(d => ({ ...d, online:true, on:false, watts:0 })));
 });
 
 app.post("/api/devices/:id/toggle", (req, res) => {
