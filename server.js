@@ -1,77 +1,36 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
-const rateLimit = require("express-rate-limit");
-const helmet = require("helmet");
-const cors = require("cors");
-const axios = require("axios");
-
 const app = express();
-const JWT_SECRET = process.env.JWT_SECRET || "energyos_secret_2024";
-const TAPO_EMAIL = process.env.TAPO_EMAIL || "";
-const TAPO_PASSWORD = process.env.TAPO_PASSWORD || "";
 
-app.use(helmet());
-app.use(cors({ origin: "*" }));
-app.use(express.json({ limit: "10kb" }));
-app.use(rateLimit({ windowMs: 15*60*1000, max: 100 }));
-
-const USERS = [{
-  id: 1,
-  username: "admin",
-  password: bcrypt.hashSync("energyos2024", 12)
-}];
+app.use(express.json());
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "*");
+  res.header("Access-Control-Allow-Methods", "*");
+  next();
+});
 
 const DEVICES = [
-  { id:"d1", name:"Heladera",     icon:"🧊", ip:"192.168.192.2" },
-  { id:"d2", name:"TV/Impresora", icon:"📺", ip:"192.168.192.3" },
-  { id:"d3", name:"Lavadora",     icon:"🫧", ip:"192.168.192.4" },
-  { id:"d4", name:"Lavavajillas", icon:"🍽️", ip:"192.168.192.5" },
+  { id:"d1", name:"Heladera",     icon:"🧊", watts:150  },
+  { id:"d2", name:"TV/Impresora", icon:"📺", watts:120  },
+  { id:"d3", name:"Lavadora",     icon:"🫧", watts:1000 },
+  { id:"d4", name:"Lavavajillas", icon:"🍽️", watts:800  },
 ];
 
-function auth(req, res, next) {
-  const token = req.headers["authorization"]?.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "Token requerido" });
-  try { req.user = jwt.verify(token, JWT_SECRET); next(); }
-  catch { res.status(401).json({ error: "Token inválido" }); }
-}
-
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", version: "1.0.0" });
+  res.json({ status:"ok", version:"1.0.0" });
 });
 
-app.post("/api/auth/login",
-  rateLimit({ windowMs:15*60*1000, max:5 }),
-  async (req, res) => {
-    const { username, password } = req.body;
-    const user = USERS.find(u => u.username === username);
-    if (!user || !await bcrypt.compare(password, user.password))
-      return res.status(401).json({ error: "Credenciales incorrectas" });
-    const token = jwt.sign(
-      { id: user.id, username: user.username },
-      JWT_SECRET,
-      { expiresIn: "8h" }
-    );
-    res.json({ token, user: { username: user.username } });
+app.get("/api/devices", (req, res) => {
+  res.json(DEVICES.map(d => ({ ...d, on:false, watts:0 })));
 });
 
-app.get("/api/devices", auth, (req, res) => {
-  res.json(DEVICES.map(d => ({
-    ...d, online: true, on: false, watts: 0
-  })));
-});
-
-app.post("/api/devices/:id/toggle", auth, async (req, res) => {
-  const device = DEVICES.find(d => d.id === req.params.id);
-  if (!device) return res.status(404).json({ error: "No encontrado" });
-  res.json({ id: device.id, on: true, message: `${device.name} toggled` });
-});
-
-app.post("/api/devices/eco", auth, (req, res) => {
-  res.json({ message: "Modo ahorro activado" });
+app.post("/api/devices/:id/toggle", (req, res) => {
+  const d = DEVICES.find(x => x.id === req.params.id);
+  if (!d) return res.status(404).json({ error:"No encontrado" });
+  res.json({ id:d.id, on:true });
 });
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`⚡ EnergyOS Backend corriendo en puerto ${PORT}`);
+  console.log("EnergyOS corriendo en puerto " + PORT);
 });
