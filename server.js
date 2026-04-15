@@ -1,4 +1,4 @@
-const express = require("express");
+ const express = require("express");
 const https = require("https");
 const app = express();
 
@@ -11,10 +11,10 @@ app.use((req, res, next) => {
 });
 
 const DEVICES = [
-  { id:"d1", name:"Heladera",     icon:"🧊", watts:150  },
+  { id:"d1", name:"Heladera",      icon:"🧊", watts:150  },
   { id:"d2", name:"TV /Impresora", icon:"📺", watts:120  },
-  { id:"d3", name:"Lavadora",     icon:"🫧", watts:1000 },
-  { id:"d4", name:"Lavavajillas", icon:"🍽️", watts:800  },
+  { id:"d3", name:"Lavadora",      icon:"🫧", watts:1000 },
+  { id:"d4", name:"Lavavajillas",  icon:"🍽️", watts:800  },
 ];
 
 let tapoToken = null;
@@ -60,32 +60,12 @@ async function getDeviceList() {
 }
 
 function decode(alias) {
-  try {
-    return Buffer.from(alias || "", "base64").toString("utf8").trim();
-  } catch(e) {
-    return (alias || "").trim();
-  }
+  try { return Buffer.from(alias || "", "base64").toString("utf8").trim(); }
+  catch(e) { return (alias || "").trim(); }
 }
 
 app.get("/api/health", (req, res) => {
   res.json({ status:"ok", version:"1.0.0" });
-});
-
-app.get("/api/tapo-test", async (req, res) => {
-  try {
-    const token = await getToken();
-    const list = await getDeviceList();
-    res.json({
-      success: !!token,
-      deviceCount: list.length,
-      devices: list.map(d => ({
-        alias_decoded: decode(d.alias),
-        status: d.status
-      }))
-    });
-  } catch(e) {
-    res.json({ success:false, error: e.message });
-  }
 });
 
 app.get("/api/devices", async (req, res) => {
@@ -93,11 +73,7 @@ app.get("/api/devices", async (req, res) => {
     const list = await getDeviceList();
     const result = DEVICES.map(d => {
       const tapo = list.find(t => decode(t.alias) === d.name);
-      return {
-        ...d,
-        online: !!tapo,
-        on: tapo ? tapo.status === 1 : false
-      };
+      return { ...d, online: !!tapo, on: tapo ? tapo.status === 1 : false };
     });
     res.json(result);
   } catch(e) {
@@ -108,7 +84,51 @@ app.get("/api/devices", async (req, res) => {
 app.post("/api/devices/:id/toggle", async (req, res) => {
   const d = DEVICES.find(x => x.id === req.params.id);
   if (!d) return res.status(404).json({ error:"No encontrado" });
-  res.json({ id:d.id, on:true });
+  try {
+    const token = await getToken();
+    const list = await getDeviceList();
+    const tapo = list.find(t => decode(t.alias) === d.name);
+    if (!tapo) return res.status(503).json({ error:"Dispositivo offline" });
+    const newState = tapo.status !== 1;
+    await post("wap.tplinkcloud.com", `/?token=${token}`, {
+      method: "passthrough",
+      params: {
+        deviceId: tapo.deviceId,
+        requestData: JSON.stringify({
+          method: "set_device_info",
+          params: { device_on: newState }
+        })
+      }
+    });
+    res.json({ id:d.id, on:newState });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/devices/eco", async (req, res) => {
+  try {
+    const token = await getToken();
+    const list = await getDeviceList();
+    await Promise.all(DEVICES.map(async d => {
+      const tapo = list.find(t => decode(t.alias) === d.name);
+      if (!tapo) return;
+      const keepOn = d.id === "d1";
+      await post("wap.tplinkcloud.com", `/?token=${token}`, {
+        method: "passthrough",
+        params: {
+          deviceId: tapo.deviceId,
+          requestData: JSON.stringify({
+            method: "set_device_info",
+            params: { device_on: keepOn }
+          })
+        }
+      });
+    }));
+    res.json({ message:"Modo ahorro activado" });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 const PORT = process.env.PORT || 3001;
