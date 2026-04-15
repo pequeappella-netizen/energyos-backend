@@ -88,7 +88,11 @@ app.get("/api/devices", async (req, res) => {
   try {
     const list = await getDeviceList();
     const result = DEVICES.map(d => {
-      const tapo = list.find(t => t.alias === d.name);
+      const decodedAlias = Buffer.from(t.alias || "", "base64").toString("utf8");
+const tapo = list.find(t => {
+  const decoded = Buffer.from(t.alias || "", "base64").toString("utf8");
+  return decoded === d.name;
+});
       return { ...d, online: !!tapo, on: tapo ? tapo.status === 1 : false };
     });
     res.json(result);
