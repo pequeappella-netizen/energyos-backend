@@ -153,14 +153,21 @@ app.get("/api/watts-test", async (req, res) => {
     const token = await getToken();
     const list = await getDeviceList();
     const tapo = list[0];
+    // Probar get_device_info
     const r = await post("wap.tplinkcloud.com", `/?token=${token}`, {
       method: "passthrough",
       params: {
         deviceId: tapo.deviceId,
-        requestData: JSON.stringify({ method:"get_current_power" })
+        requestData: JSON.stringify({ method:"get_device_info" })
       }
     });
-    res.json({ raw: r });
+    const data = JSON.parse(r.result?.responseData || "{}");
+    res.json({ 
+      raw_result: data.result,
+      current_power: data.result?.current_power,
+      power: data.result?.power,
+      on_time: data.result?.on_time
+    });
   } catch(e) {
     res.json({ error: e.message });
   }
