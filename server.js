@@ -148,7 +148,23 @@ app.post("/api/devices/eco", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-
+app.get("/api/watts-test", async (req, res) => {
+  try {
+    const token = await getToken();
+    const list = await getDeviceList();
+    const tapo = list[0];
+    const r = await post("wap.tplinkcloud.com", `/?token=${token}`, {
+      method: "passthrough",
+      params: {
+        deviceId: tapo.deviceId,
+        requestData: JSON.stringify({ method:"get_current_power" })
+      }
+    });
+    res.json({ raw: r });
+  } catch(e) {
+    res.json({ error: e.message });
+  }
+});
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, "0.0.0.0", () => {
   console.log("EnergyOS corriendo en puerto " + PORT);
