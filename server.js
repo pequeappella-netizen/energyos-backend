@@ -1,4 +1,4 @@
- const express = require("express");
+const express = require("express");
 const https = require("https");
 const app = express();
 
@@ -64,20 +64,38 @@ function decode(alias) {
   catch(e) { return (alias || "").trim(); }
 }
 
+async function getRealWatts(token, deviceId) {
+  try {
+    const r = await post("wap.tplinkcloud.com", `/?token=${token}`, {
+      method: "passthrough",
+      params: {
+        deviceId,
+        requestData: JSON.stringify({ method:"get_energy_usage" })
+      }
+    });
+    const data = JSON.parse(r.result?.responseData || "{}");
+    return data.result?.current_power || 0;
+  } catch(e) { return 0; }
+}
+
 app.get("/api/health", (req, res) => {
   res.json({ status:"ok", version:"1.0.0" });
 });
 
 app.get("/api/devices", async (req, res) => {
   try {
+    const token = await getToken();
     const list = await getDeviceList();
-    const result = DEVICES.map(d => {
+    const result = await Promise.all(DEVICES.map(async d => {
       const tapo = list.find(t => decode(t.alias) === d.name);
-      return { ...d, online: !!tapo, on: tapo ? tapo.status === 1 : false };
-    });
+      if (!tapo) return { ...d, online:false, on:false, watts:0 };
+      const on = tapo.status === 1;
+      const watts = on ? await getRealWatts(token, tapo.deviceId) : 0;
+      return { ...d, online:true, on, watts:Math.round(watts) };
+    }));
     res.json(result);
   } catch(e) {
-    res.json(DEVICES.map(d => ({ ...d, online:false, on:false })));
+    res.json(DEVICES.map(d => ({ ...d, online:false, on:false, watts:0 })));
   }
 });
 
