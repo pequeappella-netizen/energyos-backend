@@ -153,7 +153,6 @@ app.get("/api/watts-test", async (req, res) => {
     const token = await getToken();
     const list = await getDeviceList();
     const tapo = list[0];
-    // Probar get_device_info
     const r = await post("wap.tplinkcloud.com", `/?token=${token}`, {
       method: "passthrough",
       params: {
@@ -161,13 +160,8 @@ app.get("/api/watts-test", async (req, res) => {
         requestData: JSON.stringify({ method:"get_device_info" })
       }
     });
-    const data = JSON.parse(r.result?.responseData || "{}");
-    res.json({ 
-      raw_result: data.result,
-      current_power: data.result?.current_power,
-      power: data.result?.power,
-      on_time: data.result?.on_time
-    });
+    // Devolver todo el resultado crudo para ver la estructura
+    res.json(r);
   } catch(e) {
     res.json({ error: e.message });
   }
